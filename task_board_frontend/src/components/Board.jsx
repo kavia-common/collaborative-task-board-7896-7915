@@ -8,11 +8,14 @@ import TaskCard from './TaskCard';
  * PUBLIC_INTERFACE
  * Board
  * Main kanban board with columns and draggable task cards. Supports realtime sync.
+ * Enhanced: inline quick-add task per column, optimistic UI update, Supabase persistence, realtime sync.
  */
 function Board({ activeProjectId, activeTeamId, filters }) {
   const { client, subscribe } = useSupabase();
   const [columns, setColumns] = useState([]);
   const [tasks, setTasks] = useState([]);
+  // Local new-task inputs keyed by column id
+  const [newTaskTitles, setNewTaskTitles] = useState({});
 
   // Load initial board for project
   useEffect(() => {
@@ -77,7 +80,7 @@ function Board({ activeProjectId, activeTeamId, filters }) {
           return t;
         });
 
-      // Recompute positions for tasks in dest column
+    // Recompute positions for tasks in dest column
       const destTasks = newList.filter(t => t.column_id === destColId && t.id !== draggableId)
         .sort((a,b) => a.position - b.position);
       destTasks.splice(destination.index, 0, { ...moving, column_id: destColId });
@@ -100,13 +103,24 @@ function Board({ activeProjectId, activeTeamId, filters }) {
     }
   }, [client]);
 
-  // Add a quick task to a column
+  // PUBLIC_INTERFACE
+  const handleNewTaskInput = (columnId, value) => {
+    /** Updates the controlled input for the quick-add task field. */
+    setNewTaskTitles(prev => ({ ...prev, [columnId]: value }));
+  };
+
+  // PUBLIC_INTERFACE
   const addTask = async (columnId) => {
+    /** Creates a new task for a given column from the quick-add input, persists to Supabase. */
     if (!activeProjectId) return;
-    const title = prompt('Task title'); // minimal UX
+    const title = (newTaskTitles[columnId] || '').trim();
     if (!title) return;
+
     try {
+      // Persist to DB. Realtime will push the inserted row to all clients (including us).
       await createTask(client, activeProjectId, columnId, { title, status: 'todo' });
+      // Clear the input after successful insert
+      setNewTaskTitles(prev => ({ ...prev, [columnId]: '' }));
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error('Create task failed', e);
@@ -132,15 +146,29 @@ function Board({ activeProjectId, activeTeamId, filters }) {
             .filter(t => t.column_id === col.id)
             .sort((a,b) => a.position - b.position);
           const progress = computeColumnProgress(col, filteredTasks);
+          const inputVal = newTaskTitles[col.id] || '';
           return (
             <div key={col.id} className="column">
               <div className="column-header">
                 <div style={{ fontWeight:700 }}>{col.title} <span className="badge">{items.length}</span></div>
-                <button className="btn" onClick={() => addTask(col.id)}>+ Task</button>
               </div>
               <div className="progress" aria-label={`${col.title} progress`}>
                 <span style={{ width: `${progress}%` }} />
               </div>
+
+              {/* Quick add task input */}
+              <div style={{ display: 'flex', gap: 8, margin: '10px 0' }}>
+                <input
+                  aria-label={`Add task in ${col.title}`}
+                  placeholder="New task title..."
+                  value={inputVal}
+                  onChange={(e)=>handleNewTaskInput(col.id, e.target.value)}
+                  onKeyDown={(e)=> e.key==='Enter' && addTask(col.id)}
+                  style={{ flex: 1, padding: 8, border: '1px solid var(--border)', borderRadius: 10 }}
+                />
+                <button className="btn primary" onClick={() => addTask(col.id)}>Add</button>
+              </div>
+
               <Droppable droppableId={col.id}>
                 {(provided) => (
                   <div className="task-list" ref={provided.innerRef} {...provided.droppableProps}>
