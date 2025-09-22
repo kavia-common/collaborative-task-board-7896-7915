@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useSupabase } from '../../supabase/SupabaseContext';
+import { getURL } from '../../supabase/getURL';
 
 /**
  * PUBLIC_INTERFACE
@@ -14,22 +15,28 @@ function SignIn() {
   const signInWithEmail = async (e) => {
     e.preventDefault();
     setStatus('Sending magic link...');
-    const siteUrl = process.env.REACT_APP_SITE_URL || window.location.origin; // Ensure orchestrator sets REACT_APP_SITE_URL
-    const { error } = await client.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: siteUrl }
-    });
-    if (error) setStatus(error.message);
-    else setStatus('Check your email for a magic link.');
+    try {
+      const { error } = await client.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: `${getURL()}auth/callback` }
+      });
+      if (error) setStatus(error.message);
+      else setStatus('Check your email for a magic link.');
+    } catch (err) {
+      setStatus(err?.message || 'Failed to send magic link');
+    }
   };
 
   const signInWithGithub = async () => {
-    const siteUrl = process.env.REACT_APP_SITE_URL || window.location.origin;
-    const { error } = await client.auth.signInWithOAuth({
-      provider: 'github',
-      options: { redirectTo: siteUrl }
-    });
-    if (error) setStatus(error.message);
+    try {
+      const { error } = await client.auth.signInWithOAuth({
+        provider: 'github',
+        options: { redirectTo: `${getURL()}auth/callback` }
+      });
+      if (error) setStatus(error.message);
+    } catch (err) {
+      setStatus(err?.message || 'OAuth sign-in failed');
+    }
   };
 
   return (

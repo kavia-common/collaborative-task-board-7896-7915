@@ -13,9 +13,28 @@ Quick start:
    - REACT_APP_SUPABASE_URL
    - REACT_APP_SUPABASE_KEY
    - (optional) REACT_APP_SITE_URL
-2) Ensure Supabase tables exist (see src/supabase/schema.md)
+2) Ensure Supabase tables exist (see src/supabase/schema.md and src/supabase/schema.sql)
 3) npm install
 4) npm start
+
+Important Supabase configuration:
+- Authentication
+  - In Supabase Dashboard > Authentication > URL Configuration:
+    - Site URL: set to your dev/prod URL
+    - Redirect URLs allowlist:
+      * http://localhost:3000/**
+      * https://yourapp.com/**
+  - Enable Email (magic link) and optional GitHub provider.
+  - The app uses dynamic redirects via getURL(): /auth/callback
+
+- Database
+  - Tables: teams, projects, columns, tasks, chat_messages, team_members
+  - RLS enabled on all the above; membership-based policies applied
+  - See assets/supabase.md and src/supabase/schema.sql for details
+
+- Realtime
+  - Enable Realtime for the public schema
+  - Ensure columns, tasks, chat_messages are enabled for realtime
 
 Notes:
 - Realtime requires enabling Realtime on public schema and tables: columns, tasks, chat_messages.
