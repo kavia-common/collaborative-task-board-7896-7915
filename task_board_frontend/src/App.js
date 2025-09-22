@@ -1,49 +1,66 @@
-import React, { useState, useEffect } from 'react';
-import logo from './logo.svg';
-import './App.css';
+import React, { useEffect, useMemo, useState } from 'react';
+import './index.css';
+import { SupabaseProvider, useSupabase } from './supabase/SupabaseContext';
+import Navbar from './components/Navbar';
+import Sidebar from './components/Sidebar';
+import Board from './components/Board';
+import ChatPanel from './components/ChatPanel';
+import { AuthGate } from './components/auth/AuthGate';
 
+// Root wrapped with SupabaseProvider
 // PUBLIC_INTERFACE
+function AppRoot() {
+  /** This is the app root that provides Supabase context and renders the app. */
+  return (
+    <SupabaseProvider>
+      <AuthGate>
+        <App />
+      </AuthGate>
+    </SupabaseProvider>
+  );
+}
+
 function App() {
-  const [theme, setTheme] = useState('light');
+  const { user } = useSupabase();
 
-  // Effect to apply theme to document element
+  const [activeProjectId, setActiveProjectId] = useState(null);
+  const [activeTeamId, setActiveTeamId] = useState(null);
+  const [filters, setFilters] = useState({ assignees: [], labels: [], search: '' });
+
+  // Persist choices locally for convenience
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
+    const stored = localStorage.getItem('tb:preferences');
+    if (stored) {
+      const prefs = JSON.parse(stored);
+      if (prefs.activeProjectId) setActiveProjectId(prefs.activeProjectId);
+      if (prefs.activeTeamId) setActiveTeamId(prefs.activeTeamId);
+    }
+  }, []);
+  useEffect(() => {
+    localStorage.setItem('tb:preferences', JSON.stringify({ activeProjectId, activeTeamId }));
+  }, [activeProjectId, activeTeamId]);
 
-  // PUBLIC_INTERFACE
-  const toggleTheme = () => {
-    setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
-  };
+  const sidebarProps = useMemo(() => ({
+    activeTeamId,
+    setActiveTeamId,
+    filters,
+    setFilters,
+  }), [activeTeamId, filters]);
 
   return (
-    <div className="App">
-      <header className="App-header">
-        <button 
-          className="theme-toggle" 
-          onClick={toggleTheme}
-          aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-        >
-          {theme === 'light' ? '🌙 Dark' : '☀️ Light'}
-        </button>
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <p>
-          Current theme: <strong>{theme}</strong>
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div className="app-shell" data-theme="light" aria-label="Ocean Professional Task Board">
+      <Navbar
+        user={user}
+        activeProjectId={activeProjectId}
+        setActiveProjectId={setActiveProjectId}
+        activeTeamId={activeTeamId}
+        setActiveTeamId={setActiveTeamId}
+      />
+      <Sidebar {...sidebarProps} />
+      <Board activeProjectId={activeProjectId} activeTeamId={activeTeamId} filters={filters} />
+      <ChatPanel activeProjectId={activeProjectId} activeTeamId={activeTeamId} />
     </div>
   );
 }
 
-export default App;
+export default AppRoot;
